@@ -291,6 +291,27 @@ One commit per checklist step (`[PR-N] step X.Y: …`). `- [ ]` = code task; `- 
 
 ---
 
+## 11b. Implementation status (2026-10-07)
+
+All software steps **done and verified**; only the 🟡 bench steps (PR-5) remain.
+
+- PR-1…PR-4 implemented on `feature/cone-calib` (14 step-commits).
+- Verified: `colcon build` clean; 30 ROS-free unit + integration tests pass; an
+  end-to-end synthetic solve recovers `T_A_B` to ~0.6 mm / 0.09° under 0.1 mm +
+  0.02° noise; `ament_flake8` green; capture node constructs/advertises/saves and
+  tears down cleanly. `ament_pep257` shows ~33 docstring-style notices (D213 /
+  section format) — left in the readable sibling style per the repo convention
+  (siblings run red; not chased).
+- An adversarial multi-agent review was run and **5 confirmed defects fixed**:
+  (1) pivot `reject_outliers` KeyError when a whole seat is rejected (now dropped
+  with a warning); (2) capture-node callback-group starvation (joint_states now
+  in its own `ReentrantCallbackGroup` so settle works in service mode);
+  (3) unlocked session-save race (all saves under the lock + unique temp file);
+  (4) `>2` sessions silently dropped (now registers every pair into `results["pairs"]`
+  with a warning); (5) cross-check false alarm under a flipped `--reference-robot`
+  (now direction-agnostic). Each has a regression test where unit-testable.
+- **Not pushed, no MR opened** — awaiting operator bench test + review.
+
 ## 11. Open items for review
 - §7.1 trigger-service: option (a) Trigger + terminal (recommended) vs (b) `cone_calib_interfaces`.
 - Real `tip_offset` / `tip_radius` values per probe (placeholders now).
