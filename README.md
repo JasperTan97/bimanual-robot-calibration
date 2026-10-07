@@ -32,10 +32,11 @@ Design rationale and the workspace facts it is built on:
 
 ## 0. Prerequisites (before any run)
 
-1. **Source the workspace:**
+1. **Source the workspace** (set `ros2_workspace` to your workspace root):
    ```bash
+   export ros2_workspace=~/ros2_ws        # your ROS 2 workspace root
    source /opt/ros/jazzy/setup.bash
-   source ~/arms_ws/install/setup.bash
+   source $ros2_workspace/install/setup.bash
    ```
 2. **FR3 kinematic calibration — do this FIRST.** The FR3's nominal DH has
    per-unit error, so the `fr3_link0 → fr3_link8` pose from
@@ -65,7 +66,7 @@ Design rationale and the workspace facts it is built on:
 ## 1. Build
 
 ```bash
-cd ~/arms_ws
+cd $ros2_workspace
 colcon build --packages-select cone_calib --symlink-install
 source install/setup.bash
 ```
@@ -91,7 +92,7 @@ ros2 run cone_calib capture_node --ros-args \
 Terminal keys: `<Enter>` = capture the current seat · `n` = next seat ·
 `u` = undo last · `s` = save · `q` = quit + save · `seat <id>` = jump to a seat.
 
-- Raw samples stream to `~/arms_ws/data/cone_calib/<robot>_<timestamp>/session.yaml`
+- Raw samples stream to `$ros2_workspace/data/cone_calib/<robot>_<timestamp>/session.yaml`
   (incremental — a crash loses at most one capture).
 - After each capture it prints the running count, the tilt spread, and (once ≥ 3
   captures on a seat) the running **per-divot RMS**.
@@ -116,20 +117,19 @@ Point `--session` at each robot's `session.yaml`:
 
 ```bash
 ros2 run cone_calib solve \
-  --session ~/arms_ws/data/cone_calib/ur3e_*/session.yaml \
-  --session ~/arms_ws/data/cone_calib/fr3_*/session.yaml \
+  --session $ros2_workspace/data/cone_calib/ur3e_*/session.yaml \
+  --session $ros2_workspace/data/cone_calib/fr3_*/session.yaml \
   --plate   $(ros2 pkg prefix cone_calib)/share/cone_calib/config/plate.yaml \
-  --cross-check-static-tfs ~/arms_ws/src/arms_data_collection/config/static_tfs.yaml \
-  --out     ~/arms_ws/data/cone_calib/results.yaml
+  --out     $ros2_workspace/data/cone_calib/results.yaml
 ```
 
 Prints and stores `T_A_B` (translation, XYZW quaternion, RPY deg, 4×4 matrix),
 each robot's estimated tip offset + overall and **per-divot RMS**, the
 **orthogonality deviation from 90°** per robot, the inter-seat/two-route sanity
-checks, the cross-check vs `world_to_base` (targets: linear ≤ 2 mm, angular ≤
-0.05 rad), a `static_tfs.yaml`-schema entry to paste in, a xacro `<joint>`
-snippet, and a ready-to-run publish command. Optional `--reference-robot <id>`
-overrides which base is A.
+checks, a `static_tfs.yaml`-schema entry to paste in, a xacro `<joint>` snippet,
+and a ready-to-run publish command. Optional `--reference-robot <id>` overrides
+which base is A; optional `--cross-check-static-tfs <file>` compares `T_A_B`
+against a named transform in a static_tfs-format file.
 
 ---
 
@@ -152,10 +152,9 @@ robot and compare where it lands in the shared `world` frame. The difference is
 the base-to-base error, in metres. `echo_sphere` reads `world → flange` from TF,
 applies the tip offset, and prints the sphere centre in `world`.
 
-**Prerequisite:** the `world → flange` chain must be published — each robot's
-`robot_state_publisher` plus the base-to-base transform under test (either the
-`arms_data_collection` static_tfs publisher for the existing calibration, or
-cone_calib's `publish_calibration.launch.py` for a fresh result).
+**Prerequisite:** the `world → flange` TF chain must be published — each robot's
+`robot_state_publisher` plus the base-to-base transform (e.g. via cone_calib's
+`publish_calibration.launch.py`).
 
 Both robots can't occupy the same point at once, so do it **sequentially**:
 
@@ -191,7 +190,7 @@ being published yet.
 
 ROS-free math + integration tests run with plain pytest:
 ```bash
-cd ~/arms_ws/src/cone_calib
+cd $ros2_workspace/src/cone_calib
 python3 -m pytest test/test_se3.py test/test_pivot.py test/test_registration.py \
   test/test_conventions.py test/test_io.py test/test_solve.py -q
 ```

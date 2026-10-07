@@ -6,9 +6,8 @@ calibration (and TF tree) is correct. The discrepancy between the two robots is
 the base-to-base error, directly in metres.
 
 Reads TF only; never commands motion. The world->flange chain must be published
-(each robot's robot_state_publisher, plus the base-to-base transform: either the
-arms_data_collection static_tfs publisher, or cone_calib's
-publish_calibration.launch.py).
+(each robot's robot_state_publisher, plus the base-to-base transform, e.g. via
+cone_calib's publish_calibration.launch.py).
 """
 
 from cone_calib import io, se3

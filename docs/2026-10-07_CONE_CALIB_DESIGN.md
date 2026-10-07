@@ -127,7 +127,7 @@ src/cone_calib/
   README.md
 ```
 
-Scaffold by copying `src/arms_data_collection`'s `setup.py`/`setup.cfg`/`package.xml` and renaming. `data_files` keeps the `glob('launch/*launch.[pxy][yma]*')` + `glob('config/*.yaml')` pattern. `console_scripts`: `capture_node`, `solve`. **Build:** `cd /home/swisscat/arms_ws && colcon build --packages-select cone_calib --symlink-install && source install/setup.bash`.
+Scaffold by copying `src/arms_data_collection`'s `setup.py`/`setup.cfg`/`package.xml` and renaming. `data_files` keeps the `glob('launch/*launch.[pxy][yma]*')` + `glob('config/*.yaml')` pattern. `console_scripts`: `capture_node`, `solve`. **Build:** `cd $ros2_workspace && colcon build --packages-select cone_calib --symlink-install && source install/setup.bash`.
 
 ---
 

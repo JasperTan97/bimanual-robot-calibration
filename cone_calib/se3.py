@@ -2,7 +2,7 @@
 
 ROS-free. Pure numpy/scipy so the module is unit-testable and usable offline.
 
-Conventions (match every first-party module in arms_ws):
+Conventions:
   * Rotations go through ``scipy.spatial.transform.Rotation``.
   * Quaternions are ``(x, y, z, w)`` (scipy/XYZW order) everywhere a
     quaternion crosses a function boundary.

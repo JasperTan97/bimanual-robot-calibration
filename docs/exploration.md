@@ -3,7 +3,7 @@
 **Date:** 2026-10-07
 **Branch:** `feature/cone-calib` (cut from `dev`, in sync with `origin/dev`)
 **Author:** Claude (read-only reconnaissance) — no files outside this doc were modified.
-**Method:** 5 parallel read-only investigations over `arms_ws`, then 3 of the load-bearing
+**Method:** 5 parallel read-only investigations over `$ros2_workspace`, then 3 of the load-bearing
 claims (frame names, UR factory calibration, existing-calibration conventions) were
 independently re-verified from primary evidence by separate agents. All claims below carry a
 confidence level; the three re-verified topics also carry a verification verdict.
@@ -41,7 +41,7 @@ confidence level; the three re-verified topics also carry a verification verdict
 - **Dependencies:** ROS deps (`rclpy`, `tf2_ros`, `tf2_ros_py`, `geometry_msgs`, `sensor_msgs`, `std_srvs`) declared in `package.xml` as `<exec_depend>`. **`numpy`/`scipy` are NOT declared anywhere in-house** (treated as system/transitive); `install_requires=['setuptools']`. `setup.cfg` only sets `script_dir`/`install_scripts` to `$base/lib/cone_calib`. (We may choose to declare numpy/scipy for correctness — flag in design doc; matching the sibling convention means leaving them out.)
 - **Lint:** standard three ament stubs under `test/` (`test_flake8.py`, `test_pep257.py`, `test_copyright.py`; copyright one is `@pytest.mark.skip`). No `[flake8]` override in-house (ament default line length 99). The flake8/pep257 gate is **pre-existing RED** in `arms_human_data_collection` by convention (memory `feedback_arms_human_data_collection_lint_red`); the rule is "no worse than the sibling," not "chase green." Because `cone_calib` is brand-new we *can* keep it ament-clean from day one — allowed, not required.
 - **Pure-math unit tests** use plain `pytest` (`def test_*` + `assert`, importing the module directly) — precedent `src/ros2launch_gui/test/test_ansi_to_html.py`. This is exactly how the ROS-free `pivot.py`/`registration.py`/`se3.py` modules in the spec should be tested.
-- **Build:** from the workspace root. Single package: `cd /home/swisscat/arms_ws && colcon build --packages-select cone_calib --symlink-install && source install/setup.bash`. `CLAUDE.md` "Build & test" is still "Not yet implemented," so there is no committed canonical test-gate command; `colcon test` / `pytest` usage is inferred.
+- **Build:** from the workspace root. Single package: `cd $ros2_workspace && colcon build --packages-select cone_calib --symlink-install && source install/setup.bash`. `CLAUDE.md` "Build & test" is still "Not yet implemented," so there is no committed canonical test-gate command; `colcon test` / `pytest` usage is inferred.
 
 ---
 
