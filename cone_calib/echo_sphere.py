@@ -13,10 +13,34 @@ publish_calibration.launch.py).
 
 from cone_calib import io, se3
 import numpy as np
+from rcl_interfaces.msg import ParameterDescriptor
 import rclpy
 from rclpy.node import Node
 from rclpy.time import Time
 from tf2_ros import Buffer, TransformException, TransformListener
+
+
+def parse_reference(value):
+    """Parse a world-point into a 3-vector, or None.
+
+    Accepts a list/tuple of 3 numbers (ROS parses ``-p reference:=[x,y,z]`` as a
+    double array) or a '[x, y, z]'/'x,y,z' string. Returns None when empty.
+    """
+    if value is None:
+        return None
+    if isinstance(value, (list, tuple, np.ndarray)):
+        nums = [float(v) for v in value]
+        return np.array(nums) if len(nums) == 3 else None
+    text = str(value).strip().strip('[]')
+    if not text:
+        return None
+    parts = [p for p in text.replace(',', ' ').split() if p]
+    if len(parts) != 3:
+        return None
+    try:
+        return np.array([float(p) for p in parts])
+    except ValueError:
+        return None
 
 
 class SphereEcho(Node):
@@ -29,6 +53,12 @@ class SphereEcho(Node):
         self.declare_parameter('flange_frame', '')
         self.declare_parameter('tip_offset', [0.0, 0.0, 0.0])
         self.declare_parameter('rate', 2.0)
+        # Optional world-frame point to compare against (e.g. the reading from the
+        # other robot at the same physical point). If set, print the live distance.
+        # Dynamically typed so `-p reference:=[x,y,z]` (a double array) and a
+        # quoted string both work.
+        self.declare_parameter('reference', '',
+                               ParameterDescriptor(dynamic_typing=True))
 
         config_file = self.get_parameter('config_file').value
         self.world_frame = self.get_parameter('world_frame').value
@@ -45,6 +75,7 @@ class SphereEcho(Node):
             raise RuntimeError('provide either config_file or flange_frame')
         self.flange_frame = flange
         self.tip_offset = np.asarray(tip, dtype=float)
+        self.reference = parse_reference(self.get_parameter('reference').value)
 
         self.buffer = Buffer()
         self.listener = TransformListener(self.buffer, self)
@@ -54,6 +85,9 @@ class SphereEcho(Node):
             'echo sphere centre [%s]: %s -> %s, tip_offset=%s m'
             % (self.robot_id, self.world_frame, self.flange_frame,
                self.tip_offset.tolist()))
+        if self.reference is not None:
+            self.get_logger().info(
+                'comparing against reference %s m' % self.reference.tolist())
 
     def _tick(self):
         try:
@@ -68,10 +102,14 @@ class SphereEcho(Node):
         q = tf.transform.rotation
         transform = se3.pose_to_matrix([t.x, t.y, t.z], [q.x, q.y, q.z, q.w])
         sphere = (transform @ np.append(self.tip_offset, 1.0))[:3]
-        print('[%s] sphere@%s = [% .6f, % .6f, % .6f] m   (flange origin = '
-              '[% .4f, % .4f, % .4f])'
-              % (self.robot_id, self.world_frame, sphere[0], sphere[1], sphere[2],
-                 t.x, t.y, t.z), flush=True)
+        line = ('[%s] sphere@%s = [% .6f, % .6f, % .6f] m'
+                % (self.robot_id, self.world_frame, sphere[0], sphere[1], sphere[2]))
+        if self.reference is not None:
+            delta = sphere - self.reference
+            line += ('   d(ref) = %7.2f mm   delta = [% .1f, % .1f, % .1f] mm'
+                     % (1e3 * np.linalg.norm(delta),
+                        1e3 * delta[0], 1e3 * delta[1], 1e3 * delta[2]))
+        print(line, flush=True)
 
 
 def main(args=None):

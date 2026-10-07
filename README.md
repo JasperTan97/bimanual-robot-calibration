@@ -1,95 +1,132 @@
 # cone_calib
 
-Base-to-base calibration of a bimanual setup (currently a Franka **FR3** and a
-Universal Robots **UR3e**) using a fixed aluminium plate with K ≥ 3 conical
-seats. A human hand-guides each robot so a sphere/hemisphere-tipped probe sits
-in a seat and triggers a capture at several tool orientations per seat; the
-offline solver recovers each robot's seat centres (and optional probe-tip
-offset) by **pivot calibration**, then the rigid transform between the two
-bases by **Kabsch/Umeyama registration**, plus CAD sanity checks.
+Base-to-base calibration of a bimanual setup (a Franka **FR3** and a Universal
+Robots **UR3e**) using a fixed aluminium plate with K ≥ 3 conical seats. A human
+hand-guides each robot so a sphere-tipped probe sits in a seat and triggers a
+capture at several tool orientations per seat; the offline solver then recovers
+each robot's seat centres (and the probe-tip offset) by **pivot calibration**,
+the rigid transform between the two bases by **Kabsch/Umeyama registration**,
+and runs CAD sanity checks.
 
-> **This package never commands robot motion. It only reads `/joint_states` and
-> TF.** Add a robot by adding one `config/<robot_id>.yaml` — no code changes.
+> **This package only reads robot state (`/joint_states` + TF). It never
+> commands motion.** Add a robot by adding one `config/<robot_id>.yaml` — no
+> code changes.
 
-See `docs/2026-10-07_CONE_CALIB_DESIGN.md` for the full design and
-`docs/exploration.md` for the workspace facts it is built on.
+Design rationale and the workspace facts it is built on:
+`docs/2026-10-07_CONE_CALIB_DESIGN.md` and `docs/exploration.md`.
+
+---
 
 ## Conventions
 
-- **Quaternions are `(x, y, z, w)` (scipy / XYZW) everywhere.** All rotation math
-  goes through `scipy.spatial.transform.Rotation` via `cone_calib/se3.py`.
-- `T_A_B` is the pose of frame `B` in frame `A`: `x_A = T_A_B @ x_B`.
-- Reference robot **A = UR3e** (`ur3e_base_link`), so the reported `T_A_B` is the
+- **Quaternions are `(x, y, z, w)` (scipy / XYZW)** everywhere a quaternion
+  crosses a boundary.
+- `T_A_B` is the pose of frame `B` expressed in frame `A`: `x_A = T_A_B @ x_B`.
+- Reference robot **A = UR3e** (`ur3e_base_link`); the reported `T_A_B` is the
   FR3 base (`fr3_link0`) expressed in the UR3e base — directly comparable to the
   existing `world_to_base` in `arms_data_collection/config/static_tfs.yaml`.
+- `world` is aliased to `ur3e_base_link` (the UR driver publishes `world →
+  ur3e_base_link`).
 
-## Layout
+---
 
-| Module | ROS? | Purpose |
-|---|---|---|
-| `se3.py` | no | SE(3)/quaternion helpers, Kabsch/Umeyama |
-| `pivot.py` | no | pivot calibration + diagnostics/observability |
-| `registration.py` | no | inter-robot registration + CAD sanity |
-| `io.py` | no | session/result I/O, static_tfs + xacro emitters |
-| `kinematics.py` | ros | TF pose source + joint mapping (FK stubbed) |
-| `capture_node.py` | ros | settle/average/save capture node |
-| `solve.py` | no | offline CLI: sessions → results |
+## 0. Prerequisites (before any run)
 
-## Build
+1. **Source the workspace:**
+   ```bash
+   source /opt/ros/jazzy/setup.bash
+   source ~/arms_ws/install/setup.bash
+   ```
+2. **Bring both robots up** with their normal launches (FR3 via the py_panda2
+   bimanual launch; **UR3e via the repo launch** — `ur3e_control` — so
+   `robot_state_publisher` carries the per-unit factory kinematics calibration;
+   the stock UR launch uses nominal DH and is several mm off). Confirm the UR
+   driver logs **no kinematics-hash mismatch** at bringup.
+3. **Confirm the UR joint order once** (it is not pinned in config):
+   ```bash
+   ros2 topic echo /joint_states --once
+   ```
+4. **Fill in the real plate geometry** in `config/plate.yaml`:
+   `seats_nominal` (CAD coordinates in the plate frame, metres) and
+   `orthogonal_triple`. The probe `tip_offset` is already set to the measured
+   **62.5 mm** (TCP → sphere centre along flange +z) for both robots.
+
+---
+
+## 1. Build
 
 ```bash
-cd /home/swisscat/arms_ws
+cd ~/arms_ws
 colcon build --packages-select cone_calib --symlink-install
 source install/setup.bash
 ```
+(`--symlink-install` means later edits to `.py`/YAML are picked up on the next
+run without rebuilding; only adding a new executable needs a rebuild.)
 
-## Capture (per robot)
+---
 
-Bring the robot up first (FR3 via the py_panda2 bimanual launch; **UR3e via the
-repo launches** so the factory calibration is loaded — confirm no kinematics
-hash warning at bringup). Then, for the interactive terminal UX, run the node
-directly so stdin is attached:
+## 2. Capture — run **once per robot**
+
+Hand-guide the probe into a seat (FR3 hand-guiding / UR freedrive), let the arm
+settle, and press **Enter** to capture. Repeat at 8–15 tool orientations per
+seat; `n` moves to the next seat. Do every seat, then repeat for the other
+robot.
 
 ```bash
+# UR3e (swap ur3e -> fr3 for the Franka):
 ros2 run cone_calib capture_node --ros-args \
   -p config_file:=$(ros2 pkg prefix cone_calib)/share/cone_calib/config/ur3e.yaml \
   -p plate_config:=$(ros2 pkg prefix cone_calib)/share/cone_calib/config/plate.yaml
 ```
 
-Commands: `<Enter>` = capture the current seat (waits for settle, averages a
-window), `n` = next seat, `u` = undo the last capture, `s` = save, `q` =
-quit+save, `seat <id>` = jump to a seat. Raw samples are written incrementally
-to `data/cone_calib/<robot_id>_<timestamp>/session.yaml`.
+Terminal keys: `<Enter>` = capture the current seat · `n` = next seat ·
+`u` = undo last · `s` = save · `q` = quit + save · `seat <id>` = jump to a seat.
 
-Service-driven mode (e.g. from a script or `ros2 service call`):
+- Raw samples stream to `~/arms_ws/data/cone_calib/<robot>_<timestamp>/session.yaml`
+  (incremental — a crash loses at most one capture).
+- After each capture it prints the running count, the tilt spread, and (once ≥ 3
+  captures on a seat) the running **per-divot RMS**.
 
+**Settle tuning.** The node waits until all joint velocities stay below
+`joint_vel_threshold` for `settle_time`, then averages a window. The FR3's
+cartesian impedance controller holds with residual jitter (~0.004–0.006 rad/s),
+so its default threshold is **0.012 rad/s** (UR3e 0.005). The active values are
+logged at startup. If you get `settle timeout`, the message shows the current
+`max|vel|`; raise the threshold live (no rebuild):
 ```bash
-ros2 launch cone_calib capture.launch.py robot_id:=ur3e
-ros2 service call /cone_calib_capture/capture std_srvs/srv/Trigger
-ros2 service call /cone_calib_capture/next_seat std_srvs/srv/Trigger
+  ... -p joint_vel_threshold:=0.02
 ```
+If captures fire while you are still nudging the arm, lower it. `settle_time`,
+`average_window`, and `settle_timeout` are overridable the same way.
 
-Repeat for every seat (8–15 orientations each), then for the other robot.
+---
 
-## Solve (offline)
+## 3. Solve (offline)
+
+Point `--session` at each robot's `session.yaml`:
 
 ```bash
 ros2 run cone_calib solve \
-  --session data/cone_calib/ur3e_.../session.yaml \
-  --session data/cone_calib/fr3_.../session.yaml \
-  --plate $(ros2 pkg prefix cone_calib)/share/cone_calib/config/plate.yaml \
-  --cross-check-static-tfs src/arms_data_collection/config/static_tfs.yaml \
-  --out cone_calib_results.yaml
+  --session ~/arms_ws/data/cone_calib/ur3e_*/session.yaml \
+  --session ~/arms_ws/data/cone_calib/fr3_*/session.yaml \
+  --plate   $(ros2 pkg prefix cone_calib)/share/cone_calib/config/plate.yaml \
+  --cross-check-static-tfs ~/arms_ws/src/arms_data_collection/config/static_tfs.yaml \
+  --out     ~/arms_ws/data/cone_calib/results.yaml
 ```
 
-The results YAML contains `T_A_B` (translation, XYZW quaternion, RPY deg, 4×4
-matrix), estimated tip offsets, seat centres, all diagnostics/warnings, a
-`static_tfs.yaml`-schema entry to paste into the single source of truth, a xacro
-`<joint>` snippet, and a ready-to-run publish command. The solver also prints a
-cross-check of `T_A_B` against `world_to_base` (targets: linear ≤ 2 mm, angular
-≤ 0.05 rad).
+Prints and stores `T_A_B` (translation, XYZW quaternion, RPY deg, 4×4 matrix),
+each robot's estimated tip offset + overall and **per-divot RMS**, the
+**orthogonality deviation from 90°** per robot, the inter-seat/two-route sanity
+checks, the cross-check vs `world_to_base` (targets: linear ≤ 2 mm, angular ≤
+0.05 rad), a `static_tfs.yaml`-schema entry to paste in, a xacro `<joint>`
+snippet, and a ready-to-run publish command. Optional `--reference-robot <id>`
+overrides which base is A.
 
-## Publish the result
+---
+
+## 4. Publish the solved transform
+
+Copy the exact command `solve` printed, or:
 
 ```bash
 ros2 launch cone_calib publish_calibration.launch.py \
@@ -97,45 +134,82 @@ ros2 launch cone_calib publish_calibration.launch.py \
   x:=... y:=... z:=... qx:=... qy:=... qz:=... qw:=...
 ```
 
-(The exact command with the solved numbers is printed by `solve` and stored in
-the results file.)
+---
 
-## Cross-robot sanity check (`echo_sphere`)
+## 5. Cross-robot sanity check — `echo_sphere` (one robot at a time)
 
-Independent of the pivot/registration pipeline: drive each robot so its probe
-tip sits at the **same physical point** and compare the reported world-frame
-sphere centre. Agreement to a few mm means the base-to-base calibration is good;
-the difference *is* the calibration error, in metres.
+A quick, pipeline-independent check: touch the **same physical point** with each
+robot and compare where it lands in the shared `world` frame. The difference is
+the base-to-base error, in metres. `echo_sphere` reads `world → flange` from TF,
+applies the tip offset, and prints the sphere centre in `world`.
 
-Prerequisite: the `world -> flange` TF chain must be published — each robot's
-`robot_state_publisher`, plus the base-to-base transform (either the
-`arms_data_collection` static_tfs publisher, or cone_calib's
-`publish_calibration.launch.py`). `world` is aliased to `ur3e_base_link`.
+**Prerequisite:** the `world → flange` chain must be published — each robot's
+`robot_state_publisher` plus the base-to-base transform under test (either the
+`arms_data_collection` static_tfs publisher for the existing calibration, or
+cone_calib's `publish_calibration.launch.py` for a fresh result).
 
-Run one per robot (two terminals), then touch the same point with each:
+Both robots can't occupy the same point at once, so do it **sequentially**:
 
+**Step 1 — robot A.** Run it, drive A's probe to the point, read the printed
+vector:
 ```bash
 ros2 run cone_calib echo_sphere --ros-args \
   -p config_file:=$(ros2 pkg prefix cone_calib)/share/cone_calib/config/fr3.yaml
-# other terminal:  ...config/ur3e.yaml
+# -> [fr3] sphere@world = [ 0.312450,  0.104300,  0.058700] m
 ```
+Note that vector, then `Ctrl-C`.
 
-Each prints, e.g. `[fr3] sphere@world = [ 0.123456,  0.456789, -0.012345] m`.
-Hold each probe at the shared point and compare the two vectors. Overrides:
-`-p world_frame:=ur3e_base_link`, `-p flange_frame:=...`,
-`-p tip_offset:="[0.0, 0.0, 0.0625]"`, `-p rate:=5.0`.
-
-## Tests
-
-ROS-free math tests run with plain pytest:
-
+**Step 2 — robot B, with A's reading as the reference.** Drive B's probe to the
+**same** point; the tool live-prints the distance to A so you can watch it
+shrink as you align and read the final error:
 ```bash
-cd src/cone_calib && python3 -m pytest test/test_se3.py test/test_pivot.py \
-  test/test_registration.py test/test_conventions.py test/test_io.py -q
+ros2 run cone_calib echo_sphere --ros-args \
+  -p config_file:=$(ros2 pkg prefix cone_calib)/share/cone_calib/config/ur3e.yaml \
+  -p reference:="[0.312450, 0.104300, 0.058700]"
+# -> [ur3e] sphere@world = [ 0.311900, ...] m   d(ref) =   0.74 mm   delta = [-0.6, -0.5, +0.4] mm
 ```
+`d(ref)` (and the per-axis `delta`) is the base-to-base discrepancy at that
+point. Repeat at a few points around the workspace.
 
-## Status / not yet implemented
+Other overrides: `-p world_frame:=ur3e_base_link`, `-p flange_frame:=...`,
+`-p tip_offset:="[0.0, 0.0, 0.0625]"`, `-p rate:=5.0`. If you see
+`TF world -> <flange> unavailable`, the base-to-base leg of the chain isn't
+being published yet.
 
-- `pose_source: fk` and `--recompute-fk` are guarded stubs (the workspace has no
-  active FK; a correct UR recompute must be fed `my_robot_calibration.yaml`).
+---
+
+## 6. Tests
+
+ROS-free math + integration tests run with plain pytest:
+```bash
+cd ~/arms_ws/src/cone_calib
+python3 -m pytest test/test_se3.py test/test_pivot.py test/test_registration.py \
+  test/test_conventions.py test/test_io.py test/test_solve.py -q
+```
+`test_flake8.py` is green. `test_pep257.py` reports docstring-style notices
+(D213/section format) — left in the readable sibling style per the workspace
+convention (the other in-house packages run pep257 red too); not a code defect.
+
+---
+
+## 7. Troubleshooting
+
+- **`settle timeout`** — the velocity threshold is below the controller's
+  resting jitter. Raise it: `-p joint_vel_threshold:=0.02` (see §2).
+- **`TF world -> <flange> unavailable`** — the base-to-base transform (or a
+  robot's `robot_state_publisher`) isn't running. Start the static_tfs publisher
+  or `publish_calibration.launch.py` (§5 prerequisite).
+- **UR looks a few mm off everywhere** — it was likely brought up with the stock
+  launch (nominal DH). Relaunch via the `ur3e_control` repo launch so the
+  factory `my_robot_calibration.yaml` is loaded (§0).
+- **Pivot refuses to estimate the tip offset** — not enough orientation
+  diversity in a seat (tilt about varied axes). Capture more, varied tilts, or
+  set `estimate_tip_offset: false` to use the measured 62.5 mm directly.
+
+---
+
+## 8. Status / not yet implemented
+
+- `pose_source: fk` and `solve --recompute-fk` are guarded stubs (the workspace
+  has no active FK; a correct UR recompute must be fed `my_robot_calibration.yaml`).
 - Bench validation on the real robots (design doc PR-5) is pending.
