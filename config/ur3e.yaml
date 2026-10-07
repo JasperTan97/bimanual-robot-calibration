@@ -12,9 +12,10 @@ joint_states_topic: /joint_states              # root, no namespace
 joint_names: [ur3e_shoulder_pan_joint, ur3e_shoulder_lift_joint, ur3e_elbow_joint,
               ur3e_wrist_1_joint, ur3e_wrist_2_joint, ur3e_wrist_3_joint]
 pose_source: tf
-# Tip-sphere centre in the flange frame [m]. PLACEHOLDER — set to the real probe.
-tip_offset: [0.0, 0.0, 0.10]
-estimate_tip_offset: true
+# Tip-sphere centre in the flange (ur3e_tool0) frame [m].
+# measured 2026-10-07: 62.5 mm from the standard TCP along flange +z to the sphere centre.
+tip_offset: [0.0, 0.0, 0.0625]
+estimate_tip_offset: true       # refine from the captures; estimate should land near the param
 tip_radius: 0.004
 settle:
   joint_vel_threshold: 0.002

@@ -7,9 +7,10 @@ flange_frame: fr3_link8
 joint_states_topic: /fr3/franka_state_publisher/joint_states
 joint_names: [fr3_joint1, fr3_joint2, fr3_joint3, fr3_joint4, fr3_joint5, fr3_joint6, fr3_joint7]
 pose_source: tf                 # tf | fk  (fk not implemented; use tf)
-# Tip-sphere centre in the flange frame [m]. PLACEHOLDER — set to the real probe.
-tip_offset: [0.0, 0.0, 0.107]
-estimate_tip_offset: true
+# Tip-sphere centre in the flange (fr3_link8) frame [m].
+# measured 2026-10-07: 62.5 mm from the standard TCP along flange +z to the sphere centre.
+tip_offset: [0.0, 0.0, 0.0625]
+estimate_tip_offset: true       # refine from the captures; estimate should land near the param
 tip_radius: 0.004               # [m], for reporting only
 settle:
   joint_vel_threshold: 0.002    # [rad/s]

@@ -89,6 +89,8 @@ Match seat centres between robot A and B **by seat ID** (string, e.g. `p1_s1`, `
 
 - Compare **inter-seat distances** measured by each robot vs nominal CAD distances (`seats_nominal`, in a plate frame) and vs each other. Report max deviation.
 - Optionally register each robot's seat centres to the CAD nominal → `T_B_plate` per robot, giving an independent route `T_A_B = T_A_plate @ inv(T_B_plate)`. Report the discrepancy between the two routes.
+- **Per-divot residual (MSE):** each seat is probed at several orientations; the pivot reports the per-seat RMS residual (= √MSE) and max residual (`per_seat_rms`/`per_seat_max`), printed by the solver and stored in the results. This is the per-divot fit-quality check.
+- **Orthogonality check:** form the two plate vectors `(origin→a)` and `(origin→b)` from a designated seat triple (`plate.yaml: orthogonal_triple`, else the triple whose nominal angle is nearest 90°) using each robot's measured seat centres, and report the measured angle, the nominal CAD angle, and the **deviation from 90°** per robot.
 - **Cross-check vs the existing pipeline:** compare `T_A_B` against `world_to_base` from `src/arms_data_collection/config/static_tfs.yaml` (parent `world`≡`ur3e_base_link`, child `base`≡ FR3 root ≈ `fr3_link0`), modulo the `base`↔`fr3_link0` and `world`↔`ur3e_base_link` aliases. Report linear/angular diff using the house metric (linear = `||Δt||`, angular = `2·acos(|Δq_w|)`; reference thresholds **linear ≤ 2 mm, angular ≤ 0.05 rad**). This is an independent validation, **not** an equality to assume.
 
 ---
@@ -138,7 +140,7 @@ flange_frame: fr3_link8
 joint_states_topic: /fr3/franka_state_publisher/joint_states   # NOT /franka/... ; namespace is fr3
 joint_names: [fr3_joint1, fr3_joint2, fr3_joint3, fr3_joint4, fr3_joint5, fr3_joint6, fr3_joint7]
 pose_source: tf                 # tf | fk
-tip_offset: [0.0, 0.0, 0.107]   # tip-sphere centre in flange frame [m], PLACEHOLDER — edit to the real probe
+tip_offset: [0.0, 0.0, 0.0625]  # 62.5 mm from fr3_link8 along +z to the sphere centre (measured 2026-10-07)
 estimate_tip_offset: true
 tip_radius: 0.004               # [m], for reporting only
 settle:
@@ -157,7 +159,7 @@ joint_states_topic: /joint_states              # root, no namespace
 joint_names: [ur3e_shoulder_pan_joint, ur3e_shoulder_lift_joint, ur3e_elbow_joint,
               ur3e_wrist_1_joint, ur3e_wrist_2_joint, ur3e_wrist_3_joint]   # used to MAP by name, not index
 pose_source: tf
-tip_offset: [0.0, 0.0, 0.10]    # PLACEHOLDER
+tip_offset: [0.0, 0.0, 0.0625]  # 62.5 mm from ur3e_tool0 along +z to the sphere centre (measured 2026-10-07)
 estimate_tip_offset: true
 tip_radius: 0.004
 settle:
@@ -314,7 +316,7 @@ All software steps **done and verified**; only the 🟡 bench steps (PR-5) remai
 
 ## 11. Open items for review
 - §7.1 trigger-service: option (a) Trigger + terminal (recommended) vs (b) `cone_calib_interfaces`.
-- Real `tip_offset` / `tip_radius` values per probe (placeholders now).
+- `tip_offset` set to the measured 62.5 mm (both robots); `tip_radius` still a placeholder (reporting only).
 - Real `plate.yaml` `seats_nominal` CAD coordinates and seat-ID scheme (`p<placement>_s<seat>`), and K.
 - 🟡 Live-verification checklist in `exploration.md` §8 before PR-5.
 - Confirm emitting the result **into** `arms_data_collection/static_tfs.yaml` stays out of scope here (cone_calib only *produces* the pasteable entry; editing that file is an `arms_data_collection` change needing its own doc).
