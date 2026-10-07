@@ -30,6 +30,7 @@ setup(
             # format: "<executable name> = <package>.<module>:<function>"
             'capture_node = cone_calib.capture_node:main',
             'solve = cone_calib.solve:main',
+            'echo_sphere = cone_calib.echo_sphere:main',
         ],
     },
 )

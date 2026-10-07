@@ -108,6 +108,7 @@ src/cone_calib/
     kinematics.py     # flange pose source abstraction (TF lookup | FK from joints)     [ROS]
     capture_node.py   # ROS node: settle detection, averaging, saving raw samples        [ROS]
     solve.py          # offline CLI: raw data -> results                                 [ROS-free entry]
+    echo_sphere.py    # ROS: print probe sphere centre in world (cross-robot same-point check)  [ROS]
   config/
     fr3.yaml
     ur3e.yaml

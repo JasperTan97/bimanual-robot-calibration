@@ -100,6 +100,31 @@ ros2 launch cone_calib publish_calibration.launch.py \
 (The exact command with the solved numbers is printed by `solve` and stored in
 the results file.)
 
+## Cross-robot sanity check (`echo_sphere`)
+
+Independent of the pivot/registration pipeline: drive each robot so its probe
+tip sits at the **same physical point** and compare the reported world-frame
+sphere centre. Agreement to a few mm means the base-to-base calibration is good;
+the difference *is* the calibration error, in metres.
+
+Prerequisite: the `world -> flange` TF chain must be published — each robot's
+`robot_state_publisher`, plus the base-to-base transform (either the
+`arms_data_collection` static_tfs publisher, or cone_calib's
+`publish_calibration.launch.py`). `world` is aliased to `ur3e_base_link`.
+
+Run one per robot (two terminals), then touch the same point with each:
+
+```bash
+ros2 run cone_calib echo_sphere --ros-args \
+  -p config_file:=$(ros2 pkg prefix cone_calib)/share/cone_calib/config/fr3.yaml
+# other terminal:  ...config/ur3e.yaml
+```
+
+Each prints, e.g. `[fr3] sphere@world = [ 0.123456,  0.456789, -0.012345] m`.
+Hold each probe at the shared point and compare the two vectors. Overrides:
+`-p world_frame:=ur3e_base_link`, `-p flange_frame:=...`,
+`-p tip_offset:="[0.0, 0.0, 0.0625]"`, `-p rate:=5.0`.
+
 ## Tests
 
 ROS-free math tests run with plain pytest:
