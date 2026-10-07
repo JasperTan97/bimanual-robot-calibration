@@ -1,0 +1,16 @@
+# cone_calib plate config — the fixed conical-seat fixture.
+# seats_nominal are CAD coordinates in the plate frame [m], used for sanity
+# checks only (never to drive motion). Seat IDs are strings "p<placement>_s<seat>"
+# so multiple plate placements can share seats by ID.
+# PLACEHOLDER geometry — replace with the real fixture CAD before use.
+cone_half_angle_deg: 45.0
+seats_nominal:
+  p1_s1: [0.0, 0.0, 0.0]
+  p1_s2: [0.150, 0.0, 0.0]
+  p1_s3: [0.0, 0.150, 0.0]
+min_captures_per_seat: 6
+min_tilt_spread_deg: 15.0
+max_condition_number: 1.0e4
+reject_outliers: false
+outlier_mad_k: 4.0
+reference_robot: ur3e           # robot A in the reported T_A_B

@@ -1,0 +1,23 @@
+# cone_calib robot config — Universal Robots UR3e.
+# Frames/topic verified against the live workspace (see docs/exploration.md).
+# The UR3e must be brought up via the repo launches so robot_state_publisher
+# carries the per-unit factory calibration (my_robot_calibration.yaml); with the
+# stock launch TF uses nominal DH (several-mm error). Confirm no kinematics-hash
+# warning at bringup.
+robot_id: ur3e
+base_frame: ur3e_base_link
+flange_frame: ur3e_tool0        # URDF FK frame; factory-calibrated, pendant-TCP-independent
+joint_states_topic: /joint_states              # root, no namespace
+# Order is mapped by name at runtime (the broadcaster does not pin the order).
+joint_names: [ur3e_shoulder_pan_joint, ur3e_shoulder_lift_joint, ur3e_elbow_joint,
+              ur3e_wrist_1_joint, ur3e_wrist_2_joint, ur3e_wrist_3_joint]
+pose_source: tf
+# Tip-sphere centre in the flange frame [m]. PLACEHOLDER — set to the real probe.
+tip_offset: [0.0, 0.0, 0.10]
+estimate_tip_offset: true
+tip_radius: 0.004
+settle:
+  joint_vel_threshold: 0.002
+  settle_time: 0.5
+  average_window: 1.0
+  timeout: 10.0

@@ -1,0 +1,18 @@
+# cone_calib robot config — Franka FR3.
+# Frames/topic verified against the live workspace (see docs/exploration.md).
+robot_id: fr3
+base_frame: fr3_link0
+flange_frame: fr3_link8
+# NOTE: FR3 joint states are namespaced under /fr3 (NOT /franka/...).
+joint_states_topic: /fr3/franka_state_publisher/joint_states
+joint_names: [fr3_joint1, fr3_joint2, fr3_joint3, fr3_joint4, fr3_joint5, fr3_joint6, fr3_joint7]
+pose_source: tf                 # tf | fk  (fk not implemented; use tf)
+# Tip-sphere centre in the flange frame [m]. PLACEHOLDER — set to the real probe.
+tip_offset: [0.0, 0.0, 0.107]
+estimate_tip_offset: true
+tip_radius: 0.004               # [m], for reporting only
+settle:
+  joint_vel_threshold: 0.002    # [rad/s]
+  settle_time: 0.5              # [s] continuously below threshold before averaging
+  average_window: 1.0           # [s] samples averaged after settling
+  timeout: 10.0                 # [s]
