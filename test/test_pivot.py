@@ -42,6 +42,9 @@ def test_synthetic_round_trip_estimate_tip():
     assert result.rms_overall < 1e-3
     assert result.condition_number < 1.0e4
     assert result.flagged_outliers == []
+    # per-divot RMS (mean-squared-error check per seat) is reported for every seat
+    assert set(result.per_seat_rms) == set(centres)
+    assert all(v < 1e-3 for v in result.per_seat_rms.values())
 
 
 def test_fixed_tip_matches_when_exact():

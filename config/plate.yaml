@@ -8,6 +8,11 @@ seats_nominal:
   p1_s1: [0.0, 0.0, 0.0]
   p1_s2: [0.150, 0.0, 0.0]
   p1_s3: [0.0, 0.150, 0.0]
+# Three seat IDs [origin, end_a, end_b] defining two vectors (origin->end_a) and
+# (origin->end_b) that are orthogonal by design. The solver reports the measured
+# angle and its deviation from 90 deg, per robot. Omit to auto-pick the triple
+# whose nominal angle is closest to 90 deg.
+orthogonal_triple: [p1_s1, p1_s2, p1_s3]
 min_captures_per_seat: 6
 min_tilt_spread_deg: 15.0
 max_condition_number: 1.0e4

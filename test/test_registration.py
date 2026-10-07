@@ -47,6 +47,28 @@ def test_inter_seat_distance_check():
     assert check['max_abs_deviation'] < 1e-9
 
 
+def test_orthogonality_right_angle_is_zero_deviation():
+    nominal = {s: np.asarray(c, float) for s, c in _seats().items()}
+    rot = Rotation.from_euler('xyz', [10, 20, 30], degrees=True).as_matrix()
+    centres = {s: rot @ c + np.array([0.3, -0.2, 0.1]) for s, c in nominal.items()}
+    out = registration.orthogonality_check(centres, nominal,
+                                           triple=['p1_s1', 'p1_s2', 'p1_s3'])
+    assert abs(out['measured_angle_deg'] - 90.0) < 1e-6
+    assert abs(out['deviation_from_90_deg']) < 1e-6
+
+
+def test_orthogonality_detects_skew_and_auto_picks_triple():
+    # Two vectors at 80 deg; deviation from 90 must read -10 deg.
+    a = np.array([0.15, 0.0, 0.0])
+    b = np.array([0.15 * np.cos(np.radians(80)), 0.15 * np.sin(np.radians(80)), 0.0])
+    nominal = {'o': np.zeros(3), 'a': a, 'b': b}
+    out = registration.orthogonality_check(nominal, nominal)  # auto-pick triple
+    assert set(out['triple']) == {'o', 'a', 'b'}
+    assert abs(out['measured_angle_deg'] - 80.0) < 1e-6
+    assert abs(out['deviation_from_90_deg'] - (-10.0)) < 1e-6
+    assert abs(out['deviation_from_nominal_deg']) < 1e-6
+
+
 def test_two_route_discrepancy_small():
     rng = np.random.default_rng(21)
     nominal = {s: np.asarray(c, dtype=float) for s, c in _seats().items()}

@@ -196,7 +196,9 @@ def solve(argv):
 
     # --- sanity checks ---
     nominal = plate['seats_nominal']
-    sanity = {'inter_seat_vs_cad': {}, 'robot_vs_robot_distances': None,
+    orth_triple = plate.get('orthogonal_triple')
+    sanity = {'inter_seat_vs_cad': {}, 'orthogonality': {},
+              'robot_vs_robot_distances': None,
               'two_route_discrepancy': None, 'cross_check': None}
     for robot in pivots:
         chk = registration.inter_seat_distance_check(pivots[robot].seat_centres, nominal)
@@ -204,6 +206,10 @@ def solve(argv):
             'max_abs_deviation_m': chk['max_abs_deviation'],
             'per_pair_deviation_m': {'%s|%s' % p: v
                                      for p, v in chk['per_pair_deviation'].items()}}
+        orth = registration.orthogonality_check(
+            pivots[robot].seat_centres, nominal, orth_triple)
+        if orth is not None:
+            sanity['orthogonality'][robot] = orth
     rr = registration.compare_robot_distances(
         pivots[reference].seat_centres, pivots[other].seat_centres)
     sanity['robot_vs_robot_distances'] = {
@@ -304,6 +310,13 @@ def _print_summary(results):
               % (robot, ['%.4f' % v for v in diag['tip_offset']],
                  1e3 * diag['rms_overall_m'], diag['condition_number'],
                  ' est' if diag['estimated_tip_offset'] else ' fixed'))
+        per_seat = ' '.join('%s=%.3f' % (s, 1e3 * v)
+                            for s, v in sorted(diag['per_seat_rms_m'].items()))
+        print('    per-divot RMS (mm): %s' % per_seat)
+    for robot, orth in results['sanity'].get('orthogonality', {}).items():
+        print('orthogonality[%s]: %.3f deg on %s (deviation from 90 = %+.3f deg)'
+              % (robot, orth['measured_angle_deg'], orth['triple'],
+                 orth['deviation_from_90_deg']))
     cc = results['sanity'].get('cross_check')
     if cc:
         print('cross-check vs %s: linear %.3f mm angular %.4f deg -> %s'

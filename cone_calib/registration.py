@@ -99,6 +99,71 @@ def compare_robot_distances(centres_a, centres_b):
     return {'per_pair_deviation': deviations, 'max_abs_deviation': max_abs}
 
 
+def _angle_between_deg(v1, v2):
+    """Return the angle (deg) between two 3-vectors, or None if either is zero."""
+    n1 = np.linalg.norm(v1)
+    n2 = np.linalg.norm(v2)
+    if n1 == 0.0 or n2 == 0.0:
+        return None
+    cos = float(np.dot(v1, v2) / (n1 * n2))
+    return float(np.degrees(np.arccos(np.clip(cos, -1.0, 1.0))))
+
+
+def _best_orthogonal_triple(nominal):
+    """Pick (origin, a, b) whose nominal vectors are closest to orthogonal."""
+    seats = sorted(nominal)
+    best = None
+    best_dev = float('inf')
+    for origin in seats:
+        for a, b in combinations([s for s in seats if s != origin], 2):
+            ang = _angle_between_deg(
+                np.asarray(nominal[a], float) - np.asarray(nominal[origin], float),
+                np.asarray(nominal[b], float) - np.asarray(nominal[origin], float))
+            if ang is None:
+                continue
+            dev = abs(ang - 90.0)
+            if dev < best_dev:
+                best_dev = dev
+                best = (origin, a, b)
+    return best
+
+
+def orthogonality_check(centres, nominal, triple=None):
+    """Check the angle between two plate vectors and its deviation from 90 deg.
+
+    Picks (or takes) three seats (origin, a, b); forms the measured vectors
+    (origin->a) and (origin->b) from the robot-measured seat centres, and reports
+    the measured angle, the nominal (CAD) angle, and the deviation from 90 deg.
+    Returns None if the triple cannot be formed from the available centres.
+    """
+    if triple is None:
+        triple = _best_orthogonal_triple(nominal)
+    if triple is None or len(triple) != 3:
+        return None
+    origin, a, b = triple
+    if not all(k in centres for k in (origin, a, b)):
+        return None
+    v1 = np.asarray(centres[a], float) - np.asarray(centres[origin], float)
+    v2 = np.asarray(centres[b], float) - np.asarray(centres[origin], float)
+    measured = _angle_between_deg(v1, v2)
+    if measured is None:
+        return None
+    nominal_angle = None
+    if all(k in nominal for k in (origin, a, b)):
+        nominal_angle = _angle_between_deg(
+            np.asarray(nominal[a], float) - np.asarray(nominal[origin], float),
+            np.asarray(nominal[b], float) - np.asarray(nominal[origin], float))
+    out = {
+        'triple': [origin, a, b],
+        'measured_angle_deg': measured,
+        'nominal_angle_deg': nominal_angle,
+        'deviation_from_90_deg': measured - 90.0,
+    }
+    if nominal_angle is not None:
+        out['deviation_from_nominal_deg'] = measured - nominal_angle
+    return out
+
+
 def register_to_nominal(centres, nominal):
     """Return ``T_robot_plate`` (pose of the plate frame in the robot base).
 
