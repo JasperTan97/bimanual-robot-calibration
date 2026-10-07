@@ -13,7 +13,10 @@ tip_offset: [0.0, 0.0, 0.0625]
 estimate_tip_offset: true       # refine from the captures; estimate should land near the param
 tip_radius: 0.004               # [m], for reporting only
 settle:
-  joint_vel_threshold: 0.002    # [rad/s]
+  # The FR3 cartesian impedance controller holds position with residual jitter
+  # of ~0.004-0.006 rad/s, so the threshold sits above that (measured 2026-10-07).
+  # Override live with -p joint_vel_threshold:=<value> if needed.
+  joint_vel_threshold: 0.012    # [rad/s]
   settle_time: 0.5              # [s] continuously below threshold before averaging
   average_window: 1.0           # [s] samples averaged after settling
   timeout: 10.0                 # [s]

@@ -18,7 +18,9 @@ tip_offset: [0.0, 0.0, 0.0625]
 estimate_tip_offset: true       # refine from the captures; estimate should land near the param
 tip_radius: 0.004
 settle:
-  joint_vel_threshold: 0.002
+  # UR3e in freedrive is steadier than the FR3 impedance hold; raise with
+  # -p joint_vel_threshold:=<value> if freedrive residual trips the timeout.
+  joint_vel_threshold: 0.005    # [rad/s]
   settle_time: 0.5
   average_window: 1.0
   timeout: 10.0

@@ -55,11 +55,20 @@ class CaptureNode(Node):
         self.tip_offset = np.asarray(self.robot_cfg['tip_offset'], dtype=float)
         self.pose_source_kind = self.robot_cfg.get('pose_source', 'tf')
 
+        # Settle params come from the robot config but are also exposed as ROS
+        # parameters so they can be tuned live with `-p` (e.g. the FR3 cartesian
+        # impedance controller never fully stops, so its threshold must sit above
+        # the controller's residual jitter).
         settle = self.robot_cfg.get('settle', {})
-        self.vel_threshold = float(settle.get('joint_vel_threshold', 0.002))
-        self.settle_time = float(settle.get('settle_time', 0.5))
-        self.average_window = float(settle.get('average_window', 1.0))
-        self.settle_timeout = float(settle.get('timeout', 10.0))
+        self.declare_parameter('joint_vel_threshold',
+                               float(settle.get('joint_vel_threshold', 0.002)))
+        self.declare_parameter('settle_time', float(settle.get('settle_time', 0.5)))
+        self.declare_parameter('average_window', float(settle.get('average_window', 1.0)))
+        self.declare_parameter('settle_timeout', float(settle.get('timeout', 10.0)))
+        self.vel_threshold = float(self.get_parameter('joint_vel_threshold').value)
+        self.settle_time = float(self.get_parameter('settle_time').value)
+        self.average_window = float(self.get_parameter('average_window').value)
+        self.settle_timeout = float(self.get_parameter('settle_timeout').value)
 
         self.seat_ids = sorted(self.plate_cfg['seats_nominal'].keys())
         if not self.seat_ids:
@@ -124,6 +133,11 @@ class CaptureNode(Node):
             (self.robot_id, self.base_frame, self.flange_frame,
              self.robot_cfg['joint_states_topic']))
         self.get_logger().info('session -> %s' % self.session_path)
+        self.get_logger().info(
+            'settle: joint_vel_threshold=%.4f rad/s, settle_time=%.2fs, '
+            'average_window=%.2fs, timeout=%.1fs'
+            % (self.vel_threshold, self.settle_time, self.average_window,
+               self.settle_timeout))
 
     # ------------------------------------------------------------------ data
     def _js_cb(self, msg):
@@ -183,8 +197,11 @@ class CaptureNode(Node):
                 if settled:
                     break
                 if time.monotonic() - start > self.settle_timeout:
-                    return False, 'settle timeout after %.1fs (%s)' % (
-                        self.settle_timeout, info)
+                    return False, (
+                        'settle timeout after %.1fs (%s); joint_vel_threshold is '
+                        '%.4f rad/s. If the arm is at rest, raise it, e.g. re-run '
+                        'with -p joint_vel_threshold:=0.012'
+                        % (self.settle_timeout, info, self.vel_threshold))
                 time.sleep(0.02)
 
             joints = []
