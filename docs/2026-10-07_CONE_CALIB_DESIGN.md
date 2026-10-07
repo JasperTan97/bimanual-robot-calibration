@@ -191,12 +191,26 @@ Everything above is overridable from the launch/CLI command line.
 
 ---
 
-## 6a. UR calibration pre-flight (operational requirement — exploration §4)
+## 6a. Per-unit kinematic calibration pre-flight (both robots — operational requirement)
 
-The UR3e is factory/per-unit calibrated **only when brought up via the repo launches** (`ur3e_handeye.launch.xml` / `dual_robots_check_handeye.launch.xml`, which load `my_robot_calibration.yaml`). If the UR is started with the stock driver launch, TF uses nominal DH (several-mm error) and `cone_calib` would silently inherit it. Therefore:
+Both arms carry per-unit kinematic error; `cone_calib` reads the flange pose
+straight from `robot_state_publisher`, so an uncalibrated arm silently biases
+the whole result. **Both robots must be kinematically calibrated before
+capturing.**
 
-- The capture node **records `pose_source` and a note of the UR launch assumption** in every session file.
-- 🟡 Operator must confirm, at bench time, that the UR driver logs **no kinematics-hash-mismatch warning** on bringup (live proof the calibration matches this physical UR3e).
+- **FR3 — do this first.** The nominal DH gives an inaccurate `fr3_link0 →
+  fr3_link8`. Calibrate the FR3 kinematics with
+  <https://github.com/platonics-delft/kinematics_calibration> and load the
+  result before bringing the arm up for a capture session.
+- **UR3e.** Factory/per-unit calibrated **only when brought up via the repo
+  launches** (`ur3e_handeye.launch.xml` / `dual_robots_check_handeye.launch.xml`,
+  which load `my_robot_calibration.yaml`). The stock driver launch uses nominal
+  DH (several-mm error). The capture node records `pose_source` + the UR launch
+  assumption in every session file.
+- 🟡 Operator confirms at bench time that the UR driver logs **no
+  kinematics-hash-mismatch warning** on bringup (live proof the calibration
+  matches this physical UR3e), and that the FR3 is running its calibrated
+  kinematics.
 
 ---
 
@@ -288,15 +302,17 @@ One commit per checklist step (`[PR-N] step X.Y: …`). `- [ ]` = code task; `- 
 - [ ] 4.2 `publish_calibration.launch.py` (static_transform_publisher from results).
 - [ ] 4.3 `README.md` (XYZW convention stated; procedure; UR-launch pre-flight; commands).
 
-### PR-5 — bench validation
-- [ ] 🟡 5.1 Dry-run capture on FR3 + UR3e (settle/averaging/live feedback), confirm live UR `/joint_states` ordering and no UR kinematics-hash warning.
-- [ ] 🟡 5.2 Full capture (8–15 orientations × K seats × 2 robots), solve, compare `T_A_B` against `world_to_base` (linear ≤ 2 mm, angular ≤ 0.05 rad target).
+### PR-5 — bench validation  ✅ done (2026-10-07)
+- [x] 🟡 5.1 Dry-run capture on FR3 + UR3e (settle/averaging/live feedback), confirm live UR `/joint_states` ordering and no UR kinematics-hash warning.
+- [x] 🟡 5.2 Full capture (8–15 orientations × K seats × 2 robots), solve, compare `T_A_B` against `world_to_base` (linear ≤ 2 mm, angular ≤ 0.05 rad target).
 
 ---
 
 ## 11b. Implementation status (2026-10-07)
 
-All software steps **done and verified**; only the 🟡 bench steps (PR-5) remain.
+All steps **done and verified**, including bench validation (PR-5) on the real
+robots — **done 2026-10-07** (both arms kinematically calibrated first: FR3 via
+platonics-delft/kinematics_calibration, UR3e via the factory per-unit file).
 
 - PR-1…PR-4 implemented on `feature/cone-calib` (14 step-commits).
 - Verified: `colcon build` clean; 30 ROS-free unit + integration tests pass; an
@@ -313,7 +329,9 @@ All software steps **done and verified**; only the 🟡 bench steps (PR-5) remai
   (4) `>2` sessions silently dropped (now registers every pair into `results["pairs"]`
   with a warning); (5) cross-check false alarm under a flipped `--reference-robot`
   (now direction-agnostic). Each has a regression test where unit-testable.
-- **Not pushed, no MR opened** — awaiting operator bench test + review.
+- Extracted into its own standalone repo (`github.com/JasperTan97/bimanual-robot-calibration`,
+  branch `main`) via `git subtree split`, preserving the full commit history.
+- **Bench-validated on the real FR3 + UR3e (2026-10-07).**
 
 ## 11. Open items for review
 - §7.1 trigger-service: option (a) Trigger + terminal (recommended) vs (b) `cone_calib_interfaces`.

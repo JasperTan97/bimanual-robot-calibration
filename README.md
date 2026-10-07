@@ -37,16 +37,25 @@ Design rationale and the workspace facts it is built on:
    source /opt/ros/jazzy/setup.bash
    source ~/arms_ws/install/setup.bash
    ```
-2. **Bring both robots up** with their normal launches (FR3 via the py_panda2
-   bimanual launch; **UR3e via the repo launch** — `ur3e_control` — so
-   `robot_state_publisher` carries the per-unit factory kinematics calibration;
-   the stock UR launch uses nominal DH and is several mm off). Confirm the UR
-   driver logs **no kinematics-hash mismatch** at bringup.
-3. **Confirm the UR joint order once** (it is not pinned in config):
+2. **FR3 kinematic calibration — do this FIRST.** The FR3's nominal DH has
+   per-unit error, so the `fr3_link0 → fr3_link8` pose from
+   `robot_state_publisher` is off until the arm's kinematics are calibrated.
+   Run the FR3 kinematic calibration and load its result *before* capturing:
+   <https://github.com/platonics-delft/kinematics_calibration>. (This is the FR3
+   analogue of the UR3e's factory per-unit calibration in step 3 — without it
+   the FR3 flange poses, and therefore the whole result, carry a systematic
+   kinematic error.)
+3. **Bring both robots up** with their normal launches: FR3 via the py_panda2
+   bimanual launch (with the calibrated kinematics from step 2); **UR3e via the
+   repo launch** — `ur3e_control` — so `robot_state_publisher` carries the
+   per-unit factory kinematics calibration (the stock UR launch uses nominal DH
+   and is several mm off). Confirm the UR driver logs **no kinematics-hash
+   mismatch** at bringup.
+4. **Confirm the UR joint order once** (it is not pinned in config):
    ```bash
    ros2 topic echo /joint_states --once
    ```
-4. **Fill in the real plate geometry** in `config/plate.yaml`:
+5. **Fill in the real plate geometry** in `config/plate.yaml`:
    `seats_nominal` (CAD coordinates in the plate frame, metres) and
    `orthogonal_triple`. The probe `tip_offset` is already set to the measured
    **62.5 mm** (TCP → sphere centre along flange +z) for both robots.
@@ -212,4 +221,4 @@ convention (the other in-house packages run pep257 red too); not a code defect.
 
 - `pose_source: fk` and `solve --recompute-fk` are guarded stubs (the workspace
   has no active FK; a correct UR recompute must be fed `my_robot_calibration.yaml`).
-- Bench validation on the real robots (design doc PR-5) is pending.
+- Bench validation on the real robots (design doc PR-5): **done (2026-10-07)**.
